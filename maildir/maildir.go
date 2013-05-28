@@ -16,24 +16,24 @@ var (
 
 type Maildir struct {
 	path string
-	paths map[string]string
+	paths []string
 	msgs map[string]*MaildirMessage
+  name string
 }
 
 // Create a new Maildir-instance from existing maildir path.
-func NewMaildir(path string) (*Maildir, error) {
+func NewMaildir(pathstr string) (*Maildir, error) {
 	m := new(Maildir)
 
 	// TODO(mg): Support creating new maildirs?
-	_, err := os.Stat(path)
+	fi, err := os.Stat(pathstr)
 	if err != nil {
 		return nil, err
 	}
-	m.path = path
-	m paths = map[string]string {
-		'cur' : path.Join(m.path, 'cur'),
-		'new' : path.Join(m.path, 'new')
-	}
+  m.name = fi.Name()
+
+	m.path = pathstr
+	m.paths = []string{"cur", "new"}
 
 	return m, nil
 }
@@ -45,9 +45,9 @@ func (m *Maildir) ListMaildirs() ([]*Maildir, error) {
 		return nil, err
 	}
 
-	dirs := []Maildir{}
-	for i, fi := range fis {
-		if len(fi.Name()) > 1 && fi.Name()[0] == '.' && fi.IsDir() {
+	dirs := []*Maildir{}
+	for _, fi := range fis {
+		if len(fi.Name()) > 1 && fi.Name()[0] == '.' && fi.IsDir() {
 			dir, err := NewMaildir(path.Join(m.path, fi.Name()))
 			if err != nil {
 				return dirs, err
@@ -58,17 +58,35 @@ func (m *Maildir) ListMaildirs() ([]*Maildir, error) {
 	return dirs, nil
 }
 
-func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
-	maildirMsg, err := m.getMaildirMessage(key)
+func (m *Maildir) HasNewMail() bool {
+	fis, err := ioutil.ReadDir(path.Join(m.path, "new"))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return getMailMessage(maildirMsg, key)
+	if len(fis) != 0 {
+		return true
+	}
+
+	return false
+}
+
+// Get a single mail.Message given the maildir key.
+func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
+	maildirMsg, ok := m.msgs[key]
+	if !ok {
+		return nil, ErrInvalidMsgKey
+	}
+
+	return m.getMailMessage(maildirMsg, key)
 }
 
 func (m *Maildir) getMailMessage(maildirMsg *MaildirMessage, key string) (*mail.Message, error) {
-	path := path.Join(m.path + maildirMsg.subdir + key + maildirMsg.flags)
+  flags := ""
+  if maildirMsg.flags != "" {
+    flags = ":" + maildirMsg.flags
+  }
+  path := path.Join(m.path, maildirMsg.subdir, key + flags)
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -84,21 +102,12 @@ func (m *Maildir) getMailMessage(maildirMsg *MaildirMessage, key string) (*mail.
 	return msg, nil
 }
 
-func (m *Maildir) getMaildirMessage(key string) (*MaildirMessage, error) {
-	msg, ok := m.msgs[key]
-	if !ok {
-		return nil, ErrInvalidMsgKey
-	} else {
-		return msg, nil
-	}
-}
-
-// TODO(mg): Should provide keys aswell, so one can update, delete mails etc.
+// Get every message in the maildir.
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
 	msgMap := map[string]*mail.Message{}
 	for key, msg := range m.msgs {
-		mailMsg, err := getMailMessage(msg, key)
+		mailMsg, err := m.getMailMessage(msg, key)
 		if err != nil {
 			return nil, err
 		}
@@ -109,14 +118,15 @@ func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 }
 
 // Refreshes messages by rebuilding the entire msgs map.
+// TODO(mg): Make it concurrent.
 func (m *Maildir) refreshMsgs() {
 	// TODO(mg): Find some heuristic to not always update everything.
 	m.msgs = map[string]*MaildirMessage{}
 
 	// Check both "cur" and "new".
 	// TODO(mg): If we ever add "tmp" to write messages as well, rewrite this.
-	for _, path := range m.paths {
-		fis, err := ioutil.ReadDir(path)
+	for _, dir := range m.paths {
+		fis, err := ioutil.ReadDir(path.Join(m.path, dir))
 		if err != nil {
 			panic(err) // TODO(mg): Return error instead.
 		}
@@ -126,8 +136,14 @@ func (m *Maildir) refreshMsgs() {
 				continue
 			}
 
-			name = strings.Split(fi.Name(), ":")
-			m.msgs[name[0]], err = NewMailDirMessage(name[1], path)
+			name := strings.Split(fi.Name(), ":")
+      flags := ""
+
+      // If not the message has no flags.
+      if len(name) > 1 {
+        flags = name[1]
+      }
+			m.msgs[name[0]], err = NewMaildirMessage(flags, dir)
 			if err != nil {
 				// TODO(mg): Do something, probably log the offending files name.
 			}
@@ -137,10 +153,12 @@ func (m *Maildir) refreshMsgs() {
 
 // Refreshes messages in all sub-maildirs of m.
 // TODO(mg): Find a way to return errors from .refreshMsgs()
+// NOT IN USE
 func (m *Maildir) refreshMsgsSubdirs() {
-	dirs := m.ListMailDirs()
+	// TODO(mg): Handle error here.
+	dirs, _ := m.ListMaildirs()
 
-	wg := sync.WaitGroup()
+	wg := new(sync.WaitGroup)
 	wg.Add(len(dirs))
 	for _, dir := range dirs {
 		go func(dir *Maildir) {
