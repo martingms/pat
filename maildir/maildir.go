@@ -8,6 +8,7 @@ import (
 	"sync"
 	"errors"
 	"net/mail"
+	"sort"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 type Maildir struct {
 	path string
 	paths []string
-	msgs map[string]*MaildirMessage
+	msgs map[string]*maildirMessage
   name string
 }
 
@@ -81,27 +82,6 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 	return m.getMailMessage(maildirMsg, key)
 }
 
-func (m *Maildir) getMailMessage(maildirMsg *MaildirMessage, key string) (*mail.Message, error) {
-  flags := ""
-  if maildirMsg.flags != "" {
-    flags = ":" + maildirMsg.flags
-  }
-  path := path.Join(m.path, maildirMsg.subdir, key + flags)
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(mg): defer file.Close()? The reader is still used by the returning
-	// message... Not sure how to handle this tbh.
-
-	msg, err := mail.ReadMessage(file)
-	if err != nil {
-		return nil, err
-	}
-
-	return msg, nil
-}
-
 // Get every message in the maildir.
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
@@ -117,11 +97,28 @@ func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	return msgMap, nil
 }
 
+func (m *Maildir) getMailMessage(maildirMsg *maildirMessage, key string) (*mail.Message, error) {
+	path := path.Join(m.path, maildirMsg.subdir, key + maildirMsg.getFlagStr())
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	// TODO(mg): defer file.Close()? The reader is still used by the returning
+	// message... Not sure how to handle this tbh.
+
+	msg, err := mail.ReadMessage(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
 // Refreshes messages by rebuilding the entire msgs map.
 // TODO(mg): Make it concurrent.
 func (m *Maildir) refreshMsgs() {
 	// TODO(mg): Find some heuristic to not always update everything.
-	m.msgs = map[string]*MaildirMessage{}
+	m.msgs = map[string]*maildirMessage{}
 
 	// Check both "cur" and "new".
 	// TODO(mg): If we ever add "tmp" to write messages as well, rewrite this.
@@ -138,12 +135,11 @@ func (m *Maildir) refreshMsgs() {
 
 			name := strings.Split(fi.Name(), ":")
       flags := ""
-
       // If not the message has no flags.
       if len(name) > 1 {
         flags = name[1]
       }
-			m.msgs[name[0]], err = NewMaildirMessage(flags, dir)
+			m.msgs[name[0]], err = newMaildirMessage(flags, dir)
 			if err != nil {
 				// TODO(mg): Do something, probably log the offending files name.
 			}
@@ -169,17 +165,52 @@ func (m *Maildir) refreshMsgsSubdirs() {
 	wg.Wait()
 }
 
-// TODO(mg): Set flags according to spec.
-// TODO(mg): Should this be exported?
-type MaildirMessage struct {
-	flags string
+type maildirMessage struct {
+	flags map[rune]bool
 	subdir string
+	flagPrefix string
 }
 
-func NewMaildirMessage(flags, subdir string) (*MaildirMessage, error) {
-	msg := new(MaildirMessage)
-	msg.flags = flags
+func newMaildirMessage(flags, subdir string) (*maildirMessage, error) {
+	msg := new(maildirMessage)
+	msg.flags = map[rune]bool{}
+	if strings.Contains(flags, "2,") {
+		msg.flagPrefix = ":2,"
+		flagStr := strings.Split(flags, "2,")[1]
+		msg.setFlagsFromStr(flagStr)
+	}
+
 	msg.subdir = subdir
 
 	return msg, nil
+}
+
+func (mmsg *maildirMessage) getFlagStr() string {
+	flagList := []string{}
+
+	for char := range mmsg.flags {
+		flagList = append(flagList, string(char))
+	}
+
+	sort.Strings(flagList)
+
+	// TODO(mg): Find better way to string concatenate.
+	flagStr := mmsg.flagPrefix
+	for _, char := range flagList {
+		flagStr = flagStr + char
+	}
+
+	return flagStr
+}
+
+func (mmsg *maildirMessage) setFlagsFromStr(flagStr string) {
+	for _, f := range flagStr {
+		mmsg.flags[f] = true
+	}	
+}
+
+func (mmsg *maildirMessage) removeFlagsFromStr(flagStr string) {
+	for _, f := range flagStr {
+		delete(mmsg.flags, f)
+	}
 }
