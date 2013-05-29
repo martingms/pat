@@ -1,9 +1,9 @@
 package maildir
 
 import (
-	"path/filepath"
-	"os"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 // ConcurrentWalk walks the file tree rooted at root, calling walkFn for each
@@ -57,10 +57,10 @@ func concurrentWalk(path string, info os.FileInfo, walkFn filepath.WalkFunc) err
 
 	for ; active > 0; active-- {
 		select {
-    case err := <- c:
-      if err != nil {
-        return err
-      }
+		case err := <-c:
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

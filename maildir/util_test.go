@@ -1,9 +1,9 @@
 package maildir
 
 import (
-  "testing"
-	"path/filepath"
 	"os"
+	"path/filepath"
+	"testing"
 )
 
 func testWalkFuncBuilder(m map[string]error) filepath.WalkFunc {
@@ -41,7 +41,7 @@ func TestConcurrentWalk(t *testing.T) {
 			t.FailNow()
 		}
 	}
-	
+
 	for key, err := range concurrentWalkMap {
 		e, ok := builtinWalkMap[key]
 		if !ok || e != err {

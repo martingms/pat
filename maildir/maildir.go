@@ -1,14 +1,14 @@
 package maildir
 
 import (
-	"path"
-	"os"
+	"errors"
 	"io/ioutil"
+	"net/mail"
+	"os"
+	"path"
+	"sort"
 	"strings"
 	"sync"
-	"errors"
-	"net/mail"
-	"sort"
 )
 
 var (
@@ -16,10 +16,10 @@ var (
 )
 
 type Maildir struct {
-	path string
+	path  string
 	paths []string
-	msgs map[string]*maildirMessage
-  name string
+	msgs  map[string]*maildirMessage
+	Name  string
 }
 
 // Create a new Maildir-instance from existing maildir path.
@@ -31,7 +31,7 @@ func NewMaildir(pathstr string) (*Maildir, error) {
 	if err != nil {
 		return nil, err
 	}
-  m.name = fi.Name()
+	m.name = fi.Name()
 
 	m.path = pathstr
 	m.paths = []string{"cur", "new"}
@@ -74,20 +74,20 @@ func (m *Maildir) HasNewMail() bool {
 
 // Get a single mail.Message given the maildir key.
 func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
-	maildirMsg, ok := m.msgs[key]
+	_, ok := m.msgs[key]
 	if !ok {
 		return nil, ErrInvalidMsgKey
 	}
 
-	return m.getMailMessage(maildirMsg, key)
+	return m.getMailMessage(key)
 }
 
 // Get every message in the maildir.
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
 	msgMap := map[string]*mail.Message{}
-	for key, msg := range m.msgs {
-		mailMsg, err := m.getMailMessage(msg, key)
+	for key := range m.msgs {
+		mailMsg, err := m.getMailMessage(key)
 		if err != nil {
 			return nil, err
 		}
@@ -97,9 +97,9 @@ func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	return msgMap, nil
 }
 
-func (m *Maildir) getMailMessage(maildirMsg *maildirMessage, key string) (*mail.Message, error) {
-	path := path.Join(m.path, maildirMsg.subdir, key + maildirMsg.getFlagStr())
-	file, err := os.Open(path)
+func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
+	maildirMsg := m.msgs[key]
+	file, err := os.Open(maildirMsg.curName)
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +134,15 @@ func (m *Maildir) refreshMsgs() {
 			}
 
 			name := strings.Split(fi.Name(), ":")
-      flags := ""
-      // If not the message has no flags.
-      if len(name) > 1 {
-        flags = name[1]
-      }
-			m.msgs[name[0]], err = newMaildirMessage(flags, dir)
+			flags := ""
+			// If not the message has no flags.
+			if len(name) > 1 {
+				flags = name[1]
+			}
+			m.msgs[name[0]], err = newMaildirMessage(m.path, dir, name[0], flags)
 			if err != nil {
 				// TODO(mg): Do something, probably log the offending files name.
+				panic(err)
 			}
 		}
 	}
@@ -160,29 +161,35 @@ func (m *Maildir) refreshMsgsSubdirs() {
 		go func(dir *Maildir) {
 			dir.refreshMsgs()
 			wg.Done()
-		}(dir)	
+		}(dir)
 	}
 	wg.Wait()
 }
 
 type maildirMessage struct {
-	flags map[rune]bool
-	subdir string
+	flags      map[rune]bool
+	path       string
 	flagPrefix string
+	curName    string
+	subdir     string
+	key        string
 }
 
-func newMaildirMessage(flags, subdir string) (*maildirMessage, error) {
-	msg := new(maildirMessage)
-	msg.flags = map[rune]bool{}
+func newMaildirMessage(fpath, subdir, key, flags string) (*maildirMessage, error) {
+	mmsg := new(maildirMessage)
+	mmsg.flags = map[rune]bool{}
 	if strings.Contains(flags, "2,") {
-		msg.flagPrefix = ":2,"
+		mmsg.flagPrefix = ":2,"
 		flagStr := strings.Split(flags, "2,")[1]
-		msg.setFlagsFromStr(flagStr)
+		mmsg.setFlagsFromStr(flagStr)
 	}
 
-	msg.subdir = subdir
+	mmsg.path = fpath
+	mmsg.subdir = subdir
+	mmsg.key = key
+	mmsg.curName = path.Join(fpath, subdir, key+mmsg.getFlagStr())
 
-	return msg, nil
+	return mmsg, nil
 }
 
 func (mmsg *maildirMessage) getFlagStr() string {
@@ -192,6 +199,7 @@ func (mmsg *maildirMessage) getFlagStr() string {
 		flagList = append(flagList, string(char))
 	}
 
+	// Spec says flags must be sorted.
 	sort.Strings(flagList)
 
 	// TODO(mg): Find better way to string concatenate.
@@ -206,11 +214,22 @@ func (mmsg *maildirMessage) getFlagStr() string {
 func (mmsg *maildirMessage) setFlagsFromStr(flagStr string) {
 	for _, f := range flagStr {
 		mmsg.flags[f] = true
-	}	
+	}
 }
 
 func (mmsg *maildirMessage) removeFlagsFromStr(flagStr string) {
 	for _, f := range flagStr {
 		delete(mmsg.flags, f)
 	}
+}
+
+func (mmsg *maildirMessage) flush() error {
+	newName := path.Join(mmsg.path, mmsg.subdir, mmsg.key+mmsg.getFlagStr())
+	err := os.Rename(mmsg.curName, newName)
+	if err != nil {
+		return err
+	}
+	mmsg.curName = newName
+
+	return nil
 }
