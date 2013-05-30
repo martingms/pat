@@ -21,8 +21,8 @@ func TestNewMaildir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if maildir.name != "Mail" {
-		t.Fatal("incorrect maildir name. Should be Mail, was ", maildir.name)
+	if maildir.Name != "Mail" {
+		t.Fatal("incorrect maildir name. Should be Mail, was ", maildir.Name)
 	}
 }
 
@@ -82,7 +82,7 @@ func TestPrint(t *testing.T) {
 	fmt.Println("Maildir       HasNewMail")
 	fmt.Println("========================")
 	for _, dir := range submaildirs {
-		fmt.Println(dir.name, " ", dir.HasNewMail())
+		fmt.Println(dir.Name, " ", dir.HasNewMail())
 	}
 
 	fmt.Println("\n.personlig")

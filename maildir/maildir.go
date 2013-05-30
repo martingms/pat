@@ -16,10 +16,11 @@ var (
 )
 
 type Maildir struct {
+	Name  string
 	path  string
 	paths []string
 	msgs  map[string]*maildirMessage
-	Name  string
+	sync.RWMutex
 }
 
 // Create a new Maildir-instance from existing maildir path.
@@ -31,7 +32,7 @@ func NewMaildir(pathstr string) (*Maildir, error) {
 	if err != nil {
 		return nil, err
 	}
-	m.name = fi.Name()
+	m.Name = fi.Name()
 
 	m.path = pathstr
 	m.paths = []string{"cur", "new"}
@@ -74,7 +75,9 @@ func (m *Maildir) HasNewMail() bool {
 
 // Get a single mail.Message given the maildir key.
 func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
+	m.RLock()
 	_, ok := m.msgs[key]
+	m.RUnlock()
 	if !ok {
 		return nil, ErrInvalidMsgKey
 	}
@@ -85,20 +88,35 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 // Get every message in the maildir.
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
+	mutex := new(sync.RWMutex) // For locking the msgMap
 	msgMap := map[string]*mail.Message{}
+	m.RLock()
+	wg := new(sync.WaitGroup)
+	wg.Add(len(m.msgs))
 	for key := range m.msgs {
-		mailMsg, err := m.getMailMessage(key)
-		if err != nil {
-			return nil, err
-		}
-		msgMap[key] = mailMsg
+		go func(key string) {
+			mailMsg, err := m.getMailMessage(key)
+			if err != nil {
+				// TODO(mg): Handle errors better.
+				panic(err)
+			}
+			mutex.Lock()
+			msgMap[key] = mailMsg
+			mutex.Unlock()
+			wg.Done()
+		}(key)
 	}
+	m.RUnlock()
+
+	wg.Wait()
 
 	return msgMap, nil
 }
 
 func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
+	m.RLock()
 	maildirMsg := m.msgs[key]
+	m.RUnlock()
 	file, err := os.Open(maildirMsg.curName)
 	if err != nil {
 		return nil, err
@@ -118,34 +136,45 @@ func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
 // TODO(mg): Make it concurrent.
 func (m *Maildir) refreshMsgs() {
 	// TODO(mg): Find some heuristic to not always update everything.
+	m.Lock()
 	m.msgs = map[string]*maildirMessage{}
+	m.Unlock()
 
 	// Check both "cur" and "new".
 	// TODO(mg): If we ever add "tmp" to write messages as well, rewrite this.
+	wg := new(sync.WaitGroup)
 	for _, dir := range m.paths {
 		fis, err := ioutil.ReadDir(path.Join(m.path, dir))
 		if err != nil {
 			panic(err) // TODO(mg): Return error instead.
 		}
 
+		wg.Add(len(fis))
 		for _, fi := range fis {
-			if fi.IsDir() {
-				continue
-			}
+			go func(dir string, fi os.FileInfo) {
+				if fi.IsDir() {
+					return
+				}
 
-			name := strings.Split(fi.Name(), ":")
-			flags := ""
-			// If not the message has no flags.
-			if len(name) > 1 {
-				flags = name[1]
-			}
-			m.msgs[name[0]], err = newMaildirMessage(m.path, dir, name[0], flags)
-			if err != nil {
-				// TODO(mg): Do something, probably log the offending files name.
-				panic(err)
-			}
+				name := strings.Split(fi.Name(), ":")
+				flags := ""
+				// If not the message has no flags.
+				if len(name) > 1 {
+					flags = name[1]
+				}
+				m.Lock()
+				m.msgs[name[0]], err = newMaildirMessage(m.path, dir, name[0], flags)
+				m.Unlock()
+				if err != nil {
+					// TODO(mg): Do something, probably log the offending files name.
+					panic(err)
+				}
+
+				wg.Done()
+			}(dir, fi)
 		}
 	}
+	wg.Wait()
 }
 
 // Refreshes messages in all sub-maildirs of m.
