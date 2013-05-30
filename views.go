@@ -1,8 +1,8 @@
 package main
 
 import (
-  "github.com/nsf/termbox-go"
 	"errors"
+	"github.com/nsf/termbox-go"
 )
 
 var cv string // The current view.
@@ -11,8 +11,8 @@ var views = map[string]*view{
 }
 
 type view struct {
-	shortcut rune
-	renderFunc func()
+	shortcut       rune
+	renderFunc     func()
 	keyHandlerFunc func(*termbox.Event)
 	// TODO(mg): May need some state?
 }
@@ -22,9 +22,9 @@ func titleView() {
 	drawTopLine("Start")
 
 	drawPatLogo()
-	
+
 	width, height := termbox.Size()
-	verStr := "v."+VERSION
+	verStr := "v." + VERSION
 	drawString(int((width-len(verStr))/2), int(height/4)+5, verStr)
 
 	termbox.Flush()
@@ -35,7 +35,7 @@ func titleKeyHandler(ev *termbox.Event) {
 }
 
 func mainView() error {
-	return errors.New("mainView not yet implemented!")	
+	return errors.New("mainView not yet implemented!")
 }
 
 // Helper functions

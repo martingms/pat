@@ -30,7 +30,7 @@ func drawBlankLine(y int, color termbox.Attribute) {
 
 func drawString(x, y int, str string) {
 	for i, char := range str {
-		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)	
+		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
 	}
 }
 
@@ -39,8 +39,8 @@ func drawString(x, y int, str string) {
 func drawPatLogo() {
 	width, height := termbox.Size()
 
-	startx := int((width-8)/2)
-	starty := int(height/4)
+	startx := int((width - 8) / 2)
+	starty := int(height / 4)
 
 	// Row 1
 	for i := startx; i < startx+9; i++ {

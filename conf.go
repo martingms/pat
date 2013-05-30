@@ -12,6 +12,6 @@ const (
 // Colorscheme
 // Should be pretty self explanatory.
 const (
-	BAR_BG_COLOR = termbox.ColorBlue
+	BAR_BG_COLOR   = termbox.ColorBlue
 	BAR_TEXT_COLOR = termbox.ColorWhite
 )
