@@ -7,10 +7,11 @@ import (
 
 var cv string // The current view.
 var views = map[string]*view{
-	"titleView": &view{renderFunc: titleView, keyHandlerFunc: titleKeyHandler},
+	"titleView": &view{shortcut: 'd', renderFunc: titleView, keyHandlerFunc: titleKeyHandler},
 }
 
 type view struct {
+	shortcut rune
 	renderFunc func()
 	keyHandlerFunc func(*termbox.Event)
 	// TODO(mg): May need some state?
@@ -40,9 +41,15 @@ func mainView() error {
 // Helper functions
 
 func cvRender() {
-	views[cv].renderFunc()	
+	if view, ok := views[cv]; ok {
+		view.renderFunc()
+	}
+	//TODO(mg): Show some error message perhaps?
 }
 
 func cvKeyHandler(ev *termbox.Event) {
-	views[cv].keyHandlerFunc(ev)
+	if view, ok := views[cv]; ok {
+		view.keyHandlerFunc(ev)
+	}
+	//TODO(mg): Show some error message perhaps?
 }

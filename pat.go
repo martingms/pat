@@ -35,23 +35,30 @@ func main() {
 	// Main loop.
 main_loop:
 	for {
+event_switch:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
       // TODO(mg): Can we do something to break up this if/else chain nicely?
-      // Global keys like changing view
+      // Global keys.
 			if ev.Key == termbox.KeyCtrlC {
 				break main_loop
-			} else if ev.Ch == 'd' {
-        cv = "directoryView"
-        cvRender()
+			}
+
+      // Shortcuts
+      for name, view := range views {
+        if ev.Ch == view.shortcut {
+          cv = name
+          cvRender()
+          break event_switch
+        }
+      }
 
       // All other keys should be handled by the current view.
-      } else {
-        cvKeyHandler(&ev)
-      }
+      cvKeyHandler(&ev)
     case termbox.EventResize:
       cvRender()
     case termbox.EventError:
+      // TODO(mg): Probably shouldn't panic.
       panic(ev.Err)
 		}
 	}
