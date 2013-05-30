@@ -85,11 +85,16 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 	return m.getMailMessage(key)
 }
 
+// TODO(mg): Check if parallelism has any gains on large amounts of mail.
+// Overhead to large for small amounts at least, so this needs to be checked.
+// Might have to revert the entire thing.
+//
 // Get every message in the maildir.
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
 	mutex := new(sync.RWMutex) // For locking the msgMap
 	msgMap := map[string]*mail.Message{}
+
 	m.RLock()
 	wg := new(sync.WaitGroup)
 	wg.Add(len(m.msgs))
@@ -133,7 +138,7 @@ func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
 }
 
 // Refreshes messages by rebuilding the entire msgs map.
-// TODO(mg): Make it concurrent.
+// TODO(mg): Control if parallelism actually works any better.
 func (m *Maildir) refreshMsgs() {
 	// TODO(mg): Find some heuristic to not always update everything.
 	m.Lock()

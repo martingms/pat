@@ -5,6 +5,7 @@ package maildir
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"testing"
 )
 
@@ -15,6 +16,11 @@ const (
 func setup() {}
 
 func TestNewMaildir(t *testing.T) {
+	// Since this is the first test called, set this here.
+	// testing-package really needs some more bling...
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	//runtime.GOMAXPROCS(1)
+
 	// TODO(mg): Use setup() to create test-environment from scratch.
 	maildir, err := NewMaildir(TEST_MAILDIR)
 	if err != nil {
