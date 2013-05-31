@@ -37,28 +37,9 @@ func main() {
 	cv = STARTUP_VIEW
 	cv.render()
 
-	// Initialize maildirs.
-	// TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
-	mdir, err := maildir.NewMaildir(MAILDIR_PATH)
-	if err != nil {
-		// TODO(mg): Gracefully quit, don't panic.
-		panic(err)
-	}
-	// We want relative names.
-	mdir.Name = "."
-
-	mdirs, err = mdir.ListMaildirs()
-	if err != nil {
-		panic(err)
-	}
-	// There might be mail in the root directory as well.
-	// TODO(mg): Sort this list.
-	mdirs = append(mdirs, mdir)
-
 	// Main loop.
 main_loop:
 	for {
-	event_switch:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			// TODO(mg): Can we do something to break up this if/else chain nicely?

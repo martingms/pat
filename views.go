@@ -9,7 +9,7 @@ import (
 var (
 	// Predefined views.
 	TitleView         = &titleView{}
-	DirectoryListView = &directoryListView{0, 1, 0}
+	DirectoryListView = &directoryListView{listMin: 1}
 
 	// Shortcuts to those views.
 	shortcuts = map[rune]view{
@@ -49,12 +49,34 @@ func (v *titleView) handleEvent(ev *termbox.Event) {
 
 // DirectoryListView
 type directoryListView struct {
+	dirs    []*maildir.Maildir
 	listPos int
 	listMin int
 	listMax int
 }
 
 func (v *directoryListView) render() {
+	// Typically on first initialization.
+	if v.dirs == nil {
+		// Initialize maildirs.
+		// TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
+		mdir, err := maildir.NewMaildir(MAILDIR_PATH)
+		if err != nil {
+			// TODO(mg): Gracefully quit, don't panic.
+			panic(err)
+		}
+		// We want relative names.
+		mdir.Name = "."
+
+		v.dirs, err = mdir.ListMaildirs()
+		if err != nil {
+			panic(err)
+		}
+		// There might be mail in the root directory as well.
+		// TODO(mg): Sort this list.
+		v.dirs = append(v.dirs, mdir)
+	}
+
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Directories")
 
@@ -81,6 +103,7 @@ func (v *directoryListView) render() {
 func (v *directoryListView) handleEvent(ev *termbox.Event) {
 	switch {
 	// Common list operations.
+	// TODO(mg): These are useful in more views, find a way to abstract.
 	case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
 		if v.listPos < v.listMax {
 			v.listPos += 1
@@ -96,7 +119,11 @@ func (v *directoryListView) handleEvent(ev *termbox.Event) {
 		}
 		v.render()
 	case ev.Key == termbox.KeyEnter:
-		return
+		// TODO(mg): Kind of ugly no?
+		// Should I keep a pointer to these somewhere, to avoid rebuilding them?
+		// Must consider mem vs io/cpu use.
+		cv = &directoryView{dir: v.dirs[v.listPos-1]}
+		cv.render()
 	}
 }
 
