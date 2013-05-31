@@ -34,6 +34,30 @@ func drawString(x, y int, str string) {
 	}
 }
 
+func drawList(y, numCols int, colWidths []int, list [][]string, focus int) {
+	for _, line := range list {
+		if y == focus {
+			drawBlankLine(y, FOCUS_BAR_BG_COLOR)
+		}
+		x := 1
+		for col, width := range colWidths {
+			for j := 0; j < width; j++ {
+				r := ' '
+				if j < len(line[col]) {
+					r = rune(line[col][j])
+				}
+				if y == focus {
+					termbox.SetCell(x+j, y, r, FOCUS_BAR_TEXT_COLOR, FOCUS_BAR_BG_COLOR)
+				} else {
+					termbox.SetCell(x+j, y, r, termbox.ColorDefault, termbox.ColorDefault)
+				}
+			}
+			x += width
+		}
+		y++
+	}
+}
+
 // Draws pat logo as close to center as it can.
 // TODO(mg): Make a cooler logo.
 func drawPatLogo() {

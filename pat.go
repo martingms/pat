@@ -7,10 +7,17 @@ import (
 	"github.com/nsf/termbox-go"
 
 	"runtime"
+  "./maildir"
+
 )
 
 const (
 	VERSION = "0.1.12"
+)
+
+var (
+  // TODO(mg): Abstract this.
+  mdirs []*maildir.Maildir
 )
 
 func main() {
@@ -30,8 +37,24 @@ func main() {
 	cv = STARTUP_VIEW
 	views[cv].renderFunc()
 
-	// TODO(mg): Do loop in each view instead of single mainloop?
-	// Specific stuff, then default: Handle menus etc.
+  // Initialize maildirs.
+  // TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
+  mdir, err := maildir.NewMaildir(MAILDIR_PATH)
+  if err != nil {
+		// TODO(mg): Gracefully quit, don't panic.
+    panic(err)
+  }
+  // We want relative names.
+  mdir.Name = "."
+
+  mdirs, err = mdir.ListMaildirs()
+  if err != nil {
+    panic(err)
+  }
+  // There might be mail in the root directory as well.
+  // TODO(mg): Sort this list.
+  mdirs = append(mdirs, mdir)
+
 	// Main loop.
 main_loop:
 	for {
@@ -43,6 +66,27 @@ main_loop:
 			if ev.Key == termbox.KeyCtrlC {
 				break main_loop
 			}
+
+      // Common list operations.
+      switch {
+      case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
+        if listPos < listMax {
+          listPos += 1
+        } else {
+          listPos = listMin
+        }
+        cvRender()
+        break event_switch
+
+      case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
+        if listPos > listMin {
+          listPos -= 1
+        } else {
+          listPos = listMax
+        }
+        cvRender()
+        break event_switch
+      }
 
 			// Shortcuts
 			for name, view := range views {
@@ -57,6 +101,7 @@ main_loop:
 			cvKeyHandler(&ev)
 		case termbox.EventResize:
 			cvRender()
+      break event_switch
 		case termbox.EventError:
 			// TODO(mg): Probably shouldn't panic.
 			panic(ev.Err)
