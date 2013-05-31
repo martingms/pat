@@ -37,9 +37,9 @@ func main() {
 	cv = STARTUP_VIEW
 	cv.render()
 
-	// Main loop.
 main_loop:
 	for {
+	event_switch:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			// TODO(mg): Can we do something to break up this if/else chain nicely?
@@ -52,6 +52,7 @@ main_loop:
 			if v, ok := shortcuts[ev.Ch]; ok {
 				cv = v
 				cv.render()
+				break event_switch
 			}
 
 			// All other keys should be handled by the current view.
