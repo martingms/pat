@@ -20,6 +20,6 @@ const (
 	BAR_BG_COLOR   = termbox.ColorBlue
 	BAR_TEXT_COLOR = termbox.ColorWhite
 
-	FOCUS_BAR_BG_COLOR = termbox.ColorCyan
+	FOCUS_BAR_BG_COLOR   = termbox.ColorCyan
 	FOCUS_BAR_TEXT_COLOR = termbox.ColorBlack
 )

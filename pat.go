@@ -6,9 +6,8 @@ import (
 	// at all.
 	"github.com/nsf/termbox-go"
 
+	"./maildir"
 	"runtime"
-  "./maildir"
-
 )
 
 const (
@@ -16,9 +15,9 @@ const (
 )
 
 var (
-  // TODO(mg): Abstract this.
-  mdirs []*maildir.Maildir
-  cv *view // The current view
+	cv view // The current view
+	// TODO(mg): Abstract this.
+	mdirs []*maildir.Maildir
 )
 
 func main() {
@@ -38,23 +37,23 @@ func main() {
 	cv = STARTUP_VIEW
 	cv.render()
 
-  // Initialize maildirs.
-  // TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
-  mdir, err := maildir.NewMaildir(MAILDIR_PATH)
-  if err != nil {
+	// Initialize maildirs.
+	// TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
+	mdir, err := maildir.NewMaildir(MAILDIR_PATH)
+	if err != nil {
 		// TODO(mg): Gracefully quit, don't panic.
-    panic(err)
-  }
-  // We want relative names.
-  mdir.Name = "."
+		panic(err)
+	}
+	// We want relative names.
+	mdir.Name = "."
 
-  mdirs, err = mdir.ListMaildirs()
-  if err != nil {
-    panic(err)
-  }
-  // There might be mail in the root directory as well.
-  // TODO(mg): Sort this list.
-  mdirs = append(mdirs, mdir)
+	mdirs, err = mdir.ListMaildirs()
+	if err != nil {
+		panic(err)
+	}
+	// There might be mail in the root directory as well.
+	// TODO(mg): Sort this list.
+	mdirs = append(mdirs, mdir)
 
 	// Main loop.
 main_loop:
@@ -68,38 +67,38 @@ main_loop:
 				break main_loop
 			}
 
-      // Common list operations.
-      switch {
-      case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
-        if listPos < listMax {
-          listPos += 1
-        } else {
-          listPos = listMin
-        }
-        cv.render()
-        break event_switch
+			// Common list operations.
+			switch {
+			case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
+				if listPos < listMax {
+					listPos += 1
+				} else {
+					listPos = listMin
+				}
+				cv.render()
+				break event_switch
 
-      case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
-        if listPos > listMin {
-          listPos -= 1
-        } else {
-          listPos = listMax
-        }
-        cv.render()
-        break event_switch
-      }
+			case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
+				if listPos > listMin {
+					listPos -= 1
+				} else {
+					listPos = listMax
+				}
+				cv.render()
+				break event_switch
+			}
 
 			// Shortcuts
-      if v, ok := shortcuts[ev.Ch]; ok {
+			if v, ok := shortcuts[ev.Ch]; ok {
 				cv = v
 				cv.render()
-      }
+			}
 
 			// All other keys should be handled by the current view.
-			cv.keyHandler(&ev)
+			cv.handleEvent(&ev)
 		case termbox.EventResize:
 			cv.render()
-      break event_switch
+			break event_switch
 		case termbox.EventError:
 			// TODO(mg): Probably shouldn't panic.
 			panic(ev.Err)

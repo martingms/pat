@@ -1,20 +1,20 @@
 package main
 
 import (
-	"github.com/nsf/termbox-go"
 	"./maildir"
 	"fmt"
+	"github.com/nsf/termbox-go"
 )
 
 var (
 	// Predefined views.
-	TitleView = &view{renderFunc: titleView, keyHandlerFunc: titleKeyHandler}
-	DirectoryListView = &view{renderFunc: directoryListView, keyHandlerFunc: directoryListKeyHandler}
+	TitleView         = &titleView{}
+	DirectoryListView = &directoryListView{0, 1, 0}
 
 	// Shortcuts to those views.
-	shortcuts = map[rune]*view{
-		't' : TitleView,
-		'd' : DirectoryListView,
+	shortcuts = map[rune]view{
+		't': TitleView,
+		'd': DirectoryListView,
 	}
 )
 
@@ -26,22 +26,19 @@ var (
 	listMax = 0
 )
 
-type view struct {
-	renderFunc     func(interface{})
-	keyHandlerFunc func(interface{}, *termbox.Event)
-	state          interface{}
+type view interface {
+	render()
+	handleEvent(*termbox.Event)
 }
 
-func (v *view) render() {
-	v.renderFunc(v.state)
-}
+///////////
+// Views //
+///////////
 
-func (v *view) keyHandler(ev *termbox.Event) {
-	v.keyHandlerFunc(v.state, ev)
-}
+// TitleView
+type titleView struct{} // TODO(mg): What if I don't need state?
 
-// Views
-func titleView(state interface{}) {
+func (v *titleView) render() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Start")
 
@@ -54,16 +51,23 @@ func titleView(state interface{}) {
 	termbox.Flush()
 }
 
-func titleKeyHandler(state interface{}, ev *termbox.Event) {
+func (v *titleView) handleEvent(ev *termbox.Event) {
 	return
 }
 
-func directoryListView(state interface{}) {
+// DirectoryListView
+type directoryListView struct {
+	listPos int
+	listMin int
+	listMax int
+}
+
+func (v *directoryListView) render() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Directories")
 
 	list := [][]string{}
-	colWidths := []int{len(string(len(mdirs)))+2, 0, 3}
+	colWidths := []int{len(string(len(mdirs))) + 2, 0, 3}
 	for i, dir := range mdirs {
 		hasnew := ""
 		if dir.HasNewMail() {
@@ -82,29 +86,28 @@ func directoryListView(state interface{}) {
 	termbox.Flush()
 }
 
-func directoryListKeyHandler(state interface{}, ev *termbox.Event) {
+func (v *directoryListView) handleEvent(ev *termbox.Event) {
 	switch {
 	case ev.Key == termbox.KeyEnter:
-		// TODO(mg): Get what place in mdirs we are.
+		return
 	}
 }
 
-func directoryViewBuilder(dir *maildir.Maildir) *view {
-	return &view{
-		renderFunc: directoryView,
-		keyHandlerFunc: directoryKeyHandler,
-		state: dir,
-	}
+// DirectoryView
+type directoryView struct {
+	dir     *maildir.Maildir
+	listPos int
+	listMin int
+	listMax int
 }
 
-func directoryView(state interface{}) {
+func (v *directoryView) render() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	// TODO(mg): Get what place in mdirs we are.
-	drawTopLine(".personlig")
+	drawTopLine(v.dir.Name)
 
 	termbox.Flush()
 }
 
-func directoryKeyHandler(state interface{}, ev *termbox.Event) {
-
+func (v *directoryView) handleEvent(ev *termbox.Event) {
+	return
 }
