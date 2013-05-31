@@ -93,6 +93,7 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 	m.refreshMsgs()
 	mutex := new(sync.RWMutex) // For locking the msgMap
+  // The problem of doing this as a map is the fact that they're not sorted...
 	msgMap := map[string]*mail.Message{}
 
 	m.RLock()

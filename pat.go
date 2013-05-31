@@ -16,7 +16,6 @@ const (
 
 var (
 	cv view // The current view
-	// TODO(mg): Abstract this.
 )
 
 func main() {

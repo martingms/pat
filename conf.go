@@ -15,6 +15,10 @@ var (
 	STARTUP_VIEW = TitleView // Which view the program starts in.
 )
 
+const (
+	DATE_FORMAT = "Jan 02 15:04"
+)
+
 // Colorscheme
 const (
 	BAR_BG_COLOR   = termbox.ColorBlue

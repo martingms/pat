@@ -53,6 +53,7 @@ type directoryListView struct {
 	listPos int
 	listMin int
 	listMax int
+	// TODO(mg): Keep a map of directoryViews?
 }
 
 func (v *directoryListView) render() {
@@ -80,6 +81,7 @@ func (v *directoryListView) render() {
 	list := [][]string{}
 	colWidths := []int{len(string(len(v.dirs))) + 2, 0, 3}
 	for i, dir := range v.dirs {
+		// TODO(mg): Should be has _unread_ mail.
 		hasnew := ""
 		if dir.HasNewMail() {
 			hasnew = "N"
@@ -118,8 +120,9 @@ func (v *directoryListView) handleEvent(ev *termbox.Event) {
 	case ev.Key == termbox.KeyEnter:
 		// TODO(mg): Kind of ugly no?
 		// Should I keep a pointer to these somewhere, to avoid rebuilding them?
-		// Must consider mem vs io/cpu use.
-		cv = &directoryView{dir: v.dirs[v.listPos-1]}
+		// Must consider mem vs time it takes.
+		// Could store a map[dir.Name()]*directoryView on directorListView struct.
+		cv = &directoryView{dir: v.dirs[v.listPos-1], listMin: 1}
 		cv.render()
 	}
 }
@@ -130,15 +133,58 @@ type directoryView struct {
 	listPos int
 	listMin int
 	listMax int
+	// TODO(mg): Keep the messages in state?
 }
 
 func (v *directoryView) render() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine(v.dir.Name)
 
+	msgs, err := v.dir.GetAllMessages()
+	if err != nil {
+		// TODO(mg): Don't panic, show message...
+		panic(err)
+	}
+
+	list := [][]string{}
+	colWidths := []int{len(DATE_FORMAT) + 2, 30, -1}
+	// TODO(mg): Only process msgs that are shown?
+	for _, msg := range msgs {
+		date, err := parseDate(msg.Header.Get("Date"))
+		dateStr := ""
+		if err == nil {
+			dateStr = date.Format(DATE_FORMAT)
+		}
+		// else { log this so I can add more formats. }
+		//address, err := parseAddress(msg.Header.Get("From"))
+		//subject, err := parseSubject(msg.Header.Get("Subject"))
+		list = append(list, []string{dateStr, msg.Header.Get("From"), msg.Header.Get("Subject")})
+	}
+	v.listMax = len(list)
+
+	drawList(1, 3, colWidths, list, v.listPos)
+
 	termbox.Flush()
 }
 
 func (v *directoryView) handleEvent(ev *termbox.Event) {
-	return
+	switch {
+	// Common list operations.
+	// TODO(mg): These are useful in more views, find a way to abstract.
+	case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
+		if v.listPos < v.listMax {
+			v.listPos += 1
+		} else {
+			v.listPos = v.listMin
+		}
+		v.render()
+	case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
+		if v.listPos > v.listMin {
+			v.listPos -= 1
+		} else {
+			v.listPos = v.listMax
+		}
+		v.render()
+	case ev.Key == termbox.KeyEnter:
+	}
 }

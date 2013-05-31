@@ -35,12 +35,16 @@ func drawString(x, y int, str string) {
 }
 
 func drawList(y, numCols int, colWidths []int, list [][]string, focus int) {
+	termw, _ := termbox.Size()
 	for _, line := range list {
 		if y == focus {
 			drawBlankLine(y, FOCUS_BAR_BG_COLOR)
 		}
 		x := 1
 		for col, width := range colWidths {
+			if width == -1 {
+				width = termw - x
+			}
 			for j := 0; j < width; j++ {
 				r := ' '
 				if j < len(line[col]) {
