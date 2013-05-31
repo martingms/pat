@@ -40,14 +40,14 @@ func NewMaildir(pathstr string) (*Maildir, error) {
 	return m, nil
 }
 
-// List all sub-maildirs inside a Maildir.
+// List all sub-maildirs inside a Maildir including itself.
 func (m *Maildir) ListMaildirs() ([]*Maildir, error) {
 	fis, err := ioutil.ReadDir(m.path)
 	if err != nil {
 		return nil, err
 	}
 
-	dirs := []*Maildir{}
+	dirs := []*Maildir{m}
 	for _, fi := range fis {
 		if len(fi.Name()) > 1 && fi.Name()[0] == '.' && fi.IsDir() {
 			dir, err := NewMaildir(path.Join(m.path, fi.Name()))

@@ -72,17 +72,14 @@ func (v *directoryListView) render() {
 		if err != nil {
 			panic(err)
 		}
-		// There might be mail in the root directory as well.
-		// TODO(mg): Sort this list.
-		v.dirs = append(v.dirs, mdir)
 	}
 
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Directories")
 
 	list := [][]string{}
-	colWidths := []int{len(string(len(mdirs))) + 2, 0, 3}
-	for i, dir := range mdirs {
+	colWidths := []int{len(string(len(v.dirs))) + 2, 0, 3}
+	for i, dir := range v.dirs {
 		hasnew := ""
 		if dir.HasNewMail() {
 			hasnew = "N"

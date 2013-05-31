@@ -6,18 +6,17 @@ import (
 	// at all.
 	"github.com/nsf/termbox-go"
 
-	"./maildir"
+	//"./maildir"
 	"runtime"
 )
 
 const (
-	VERSION = "0.1.12"
+	VERSION = "0.0.21"
 )
 
 var (
 	cv view // The current view
 	// TODO(mg): Abstract this.
-	mdirs []*maildir.Maildir
 )
 
 func main() {
