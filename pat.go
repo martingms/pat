@@ -18,6 +18,7 @@ const (
 var (
   // TODO(mg): Abstract this.
   mdirs []*maildir.Maildir
+  cv *view // The current view
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	termbox.SetInputMode(termbox.InputEsc)
 
 	cv = STARTUP_VIEW
-	views[cv].renderFunc()
+	cv.render()
 
   // Initialize maildirs.
   // TODO(mg): Abstract this to allow imap, other mailbox-specs etc.
@@ -75,7 +76,7 @@ main_loop:
         } else {
           listPos = listMin
         }
-        cvRender()
+        cv.render()
         break event_switch
 
       case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
@@ -84,23 +85,20 @@ main_loop:
         } else {
           listPos = listMax
         }
-        cvRender()
+        cv.render()
         break event_switch
       }
 
 			// Shortcuts
-			for name, view := range views {
-				if ev.Ch == view.shortcut {
-					cv = name
-					cvRender()
-					break event_switch
-				}
-			}
+      if v, ok := shortcuts[ev.Ch]; ok {
+				cv = v
+				cv.render()
+      }
 
 			// All other keys should be handled by the current view.
-			cvKeyHandler(&ev)
+			cv.keyHandler(&ev)
 		case termbox.EventResize:
-			cvRender()
+			cv.render()
       break event_switch
 		case termbox.EventError:
 			// TODO(mg): Probably shouldn't panic.

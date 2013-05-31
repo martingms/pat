@@ -2,27 +2,21 @@ package main
 
 import (
 	"github.com/nsf/termbox-go"
-	//"./maildir"
+	"./maildir"
 	"fmt"
 )
 
-// TODO(mg): This way of doing this is cute but prone to fail. Find a new strategy.
-// It's getting hard to avoid circular definitions.
-//
-// The current view
-var cv string
-var views = map[string]*view{
-	// We don't really need a shortcut here.
-	"titleView": &view{shortcut: 't', renderFunc: titleView, keyHandlerFunc: titleKeyHandler},
-	"directoryListView": &view{shortcut: 'd', renderFunc: directoryListView, keyHandlerFunc: directoryListKeyHandler},
-}
+var (
+	// Predefined views.
+	TitleView = &view{renderFunc: titleView, keyHandlerFunc: titleKeyHandler}
+	DirectoryListView = &view{renderFunc: directoryListView, keyHandlerFunc: directoryListKeyHandler}
 
-type view struct {
-	shortcut       rune
-	renderFunc     func()
-	keyHandlerFunc func(*termbox.Event)
-	// TODO(mg): May need some state?
-}
+	// Shortcuts to those views.
+	shortcuts = map[rune]*view{
+		't' : TitleView,
+		'd' : DirectoryListView,
+	}
+)
 
 // TODO(mg): Keeping some state here for the time being.
 // Find a better way as this will fuck shit up.
@@ -32,14 +26,22 @@ var (
 	listMax = 0
 )
 
-func resetList() {
-	listPos = 0
-	listMin = 1
-	listMax = 0
+type view struct {
+	renderFunc     func(interface{})
+	keyHandlerFunc func(interface{}, *termbox.Event)
+	state          interface{}
+}
+
+func (v *view) render() {
+	v.renderFunc(v.state)
+}
+
+func (v *view) keyHandler(ev *termbox.Event) {
+	v.keyHandlerFunc(v.state, ev)
 }
 
 // Views
-func titleView() {
+func titleView(state interface{}) {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Start")
 
@@ -52,11 +54,11 @@ func titleView() {
 	termbox.Flush()
 }
 
-func titleKeyHandler(ev *termbox.Event) {
+func titleKeyHandler(state interface{}, ev *termbox.Event) {
 	return
 }
 
-func directoryListView() {
+func directoryListView(state interface{}) {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine("Directories")
 
@@ -80,16 +82,22 @@ func directoryListView() {
 	termbox.Flush()
 }
 
-func directoryListKeyHandler(ev *termbox.Event) {
+func directoryListKeyHandler(state interface{}, ev *termbox.Event) {
 	switch {
 	case ev.Key == termbox.KeyEnter:
 		// TODO(mg): Get what place in mdirs we are.
-		cv = "directoryView"
-		directoryView()
 	}
 }
 
-func directoryView() {
+func directoryViewBuilder(dir *maildir.Maildir) *view {
+	return &view{
+		renderFunc: directoryView,
+		keyHandlerFunc: directoryKeyHandler,
+		state: dir,
+	}
+}
+
+func directoryView(state interface{}) {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	// TODO(mg): Get what place in mdirs we are.
 	drawTopLine(".personlig")
@@ -97,20 +105,6 @@ func directoryView() {
 	termbox.Flush()
 }
 
-func directoryKeyHandler(ev *termbox.Event) {
+func directoryKeyHandler(state interface{}, ev *termbox.Event) {
 
-}
-
-/////////////////////////////////////////////////
-// Helper functions
-func cvRender() {
-	if view, ok := views[cv]; ok {
-		view.renderFunc()
-	}
-}
-
-func cvKeyHandler(ev *termbox.Event) {
-	if view, ok := views[cv]; ok {
-		view.keyHandlerFunc(ev)
-	}
 }

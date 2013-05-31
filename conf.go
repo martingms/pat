@@ -11,8 +11,8 @@ const (
 )
 
 // Misc
-const (
-	STARTUP_VIEW = "titleView" // Which view the program starts in.
+var (
+	STARTUP_VIEW = TitleView // Which view the program starts in.
 )
 
 // Colorscheme
