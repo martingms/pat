@@ -67,27 +67,6 @@ main_loop:
 				break main_loop
 			}
 
-			// Common list operations.
-			switch {
-			case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
-				if listPos < listMax {
-					listPos += 1
-				} else {
-					listPos = listMin
-				}
-				cv.render()
-				break event_switch
-
-			case ev.Ch == 'k' || ev.Key == termbox.KeyArrowUp:
-				if listPos > listMin {
-					listPos -= 1
-				} else {
-					listPos = listMax
-				}
-				cv.render()
-				break event_switch
-			}
-
 			// Shortcuts
 			if v, ok := shortcuts[ev.Ch]; ok {
 				cv = v
