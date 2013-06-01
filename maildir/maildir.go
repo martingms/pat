@@ -74,7 +74,7 @@ func (m *Maildir) HasNewMail() bool {
 }
 
 // Get a single mail.Message given the maildir key.
-func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
+func (m *Maildir) GetMessage(key string) (mail.Header, error) {
 	m.RLock()
 	_, ok := m.msgs[key]
 	m.RUnlock()
@@ -82,7 +82,7 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 		return nil, ErrInvalidMsgKey
 	}
 
-	return m.getMailMessage(key)
+	return m.getMailHeader(key)
 }
 
 // TODO(mg): Check if parallelism has any gains on large amounts of mail.
@@ -90,24 +90,21 @@ func (m *Maildir) GetMessage(key string) (*mail.Message, error) {
 // Might have to revert the entire thing.
 //
 // Get every message in the maildir.
-func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
+func (m *Maildir) GetAllMessages() (mails Mails, err error) {
 	m.refreshMsgs()
-	mutex := new(sync.RWMutex) // For locking the msgMap
-  // The problem of doing this as a map is the fact that they're not sorted...
-	msgMap := map[string]*mail.Message{}
-
-	m.RLock()
+	mutex := new(sync.RWMutex) // For locking the out aray
 	wg := new(sync.WaitGroup)
 	wg.Add(len(m.msgs))
+	m.RLock()
 	for key := range m.msgs {
 		go func(key string) {
-			mailMsg, err := m.getMailMessage(key)
+			mailHeader, err := m.getMailHeader(key)
 			if err != nil {
 				// TODO(mg): Handle errors better.
 				panic(err)
 			}
 			mutex.Lock()
-			msgMap[key] = mailMsg
+      mails = append(mails, Mail{key: key, Header: mailHeader})
 			mutex.Unlock()
 			wg.Done()
 		}(key)
@@ -116,10 +113,10 @@ func (m *Maildir) GetAllMessages() (map[string]*mail.Message, error) {
 
 	wg.Wait()
 
-	return msgMap, nil
+	return mails, nil
 }
 
-func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
+func (m *Maildir) getMailHeader(key string) (mail.Header, error) {
 	m.RLock()
 	maildirMsg := m.msgs[key]
 	m.RUnlock()
@@ -127,15 +124,15 @@ func (m *Maildir) getMailMessage(key string) (*mail.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO(mg): defer file.Close()? The reader is still used by the returning
-	// message... Not sure how to handle this tbh.
+	// We don't care about the rest of the message right now, we only want the headers.
+	defer file.Close()
 
 	msg, err := mail.ReadMessage(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return msg.Header, nil
 }
 
 // Refreshes messages by rebuilding the entire msgs map.
@@ -201,6 +198,36 @@ func (m *Maildir) refreshMsgsSubdirs() {
 	wg.Wait()
 }
 
+// The type returned on all calls for messages.
+type Mail struct {
+  Header mail.Header
+  key string
+}
+
+// TODO(mg):
+//func (m *Mail) SetRead()
+
+// For sorting.
+type Mails []Mail
+
+func (m Mails) Len() int {
+  return len(m)
+}
+
+func (m Mails) Less(i, j int) bool {
+	// TODO(mg): Support sorting by other stuff.
+	datei, _ := parseDate(&m[i].Header)
+	datej, _ := parseDate(&m[j].Header)
+
+	return datei.Before(datej)
+}
+
+func (m Mails) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
+
+// Internal representation.
 type maildirMessage struct {
 	flags      map[rune]bool
 	path       string

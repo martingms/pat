@@ -4,6 +4,7 @@ import (
 	"./maildir"
 	"fmt"
 	"github.com/nsf/termbox-go"
+	"sort"
 )
 
 var (
@@ -133,32 +134,36 @@ type directoryView struct {
 	listPos int
 	listMin int
 	listMax int
-	// TODO(mg): Keep the messages in state?
+	mails   maildir.Mails
 }
 
 func (v *directoryView) render() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawTopLine(v.dir.Name)
 
-	msgs, err := v.dir.GetAllMessages()
-	if err != nil {
-		// TODO(mg): Don't panic, show message...
-		panic(err)
+	if v.mails == nil {
+		var err error
+		v.mails, err = v.dir.GetAllMessages()
+		if err != nil {
+			// TODO(mg): Don't panic, show error message instead.
+			panic(err)
+		}
+		sort.Sort(v.mails)
 	}
+
 
 	list := [][]string{}
 	colWidths := []int{len(DATE_FORMAT) + 2, 30, -1}
 	// TODO(mg): Only process msgs that are shown?
-	for _, msg := range msgs {
-		date, err := parseDate(msg.Header.Get("Date"))
+	for _, mail := range v.mails {
+		date, err := parseDate(&mail.Header)
 		dateStr := ""
 		if err == nil {
 			dateStr = date.Format(DATE_FORMAT)
 		}
-		// else { log this so I can add more formats. }
 		//address, err := parseAddress(msg.Header.Get("From"))
 		//subject, err := parseSubject(msg.Header.Get("Subject"))
-		list = append(list, []string{dateStr, msg.Header.Get("From"), msg.Header.Get("Subject")})
+		list = append(list, []string{dateStr, mail.Header.Get("From"), mail.Header.Get("Subject")})
 	}
 	v.listMax = len(list)
 
@@ -171,6 +176,7 @@ func (v *directoryView) handleEvent(ev *termbox.Event) {
 	switch {
 	// Common list operations.
 	// TODO(mg): These are useful in more views, find a way to abstract.
+	// TODO(mg): Add pgup/pgdn/G/gg and other essential vim commands.
 	case ev.Ch == 'j' || ev.Key == termbox.KeyArrowDown:
 		if v.listPos < v.listMax {
 			v.listPos += 1
@@ -184,6 +190,9 @@ func (v *directoryView) handleEvent(ev *termbox.Event) {
 		} else {
 			v.listPos = v.listMax
 		}
+		v.render()
+	case ev.Key == termbox.KeyCtrlR:
+		v.mails = nil
 		v.render()
 	case ev.Key == termbox.KeyEnter:
 	}

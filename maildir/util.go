@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
+	"net/mail"
 )
 
 // ConcurrentWalk walks the file tree rooted at root, calling walkFn for each
@@ -64,4 +66,40 @@ func concurrentWalk(path string, info os.FileInfo, walkFn filepath.WalkFunc) err
 		}
 	}
 	return nil
+}
+
+
+// Copied from pat utils to avoid circular dependencies.
+var formats = []string{
+  "Mon, 2 Jan 2006 15:04:05 -0700",
+  "Mon, 2 Jan 2006 15:04:05 -0700 (MST)",
+  time.ANSIC,
+  time.UnixDate,
+  time.RubyDate,
+  time.RFC822,
+  time.RFC822Z,
+  time.RFC850,
+  time.RFC1123,
+  time.RFC1123Z,
+  time.RFC3339,
+  time.RFC3339Nano, // lol
+}
+
+// Copied from pat utils to avoid circular dependencies.
+func parseDate(h *mail.Header) (t time.Time, err error) {
+  // We prefer Date header to Delivery-date.
+  // TODO(mg): Should we?
+  dateHeaders := []string{h.Get("Date"), h.Get("Delivery-date")}
+
+header_loop:
+  for _, val := range dateHeaders {
+    for _, format := range formats {
+      t, err = time.Parse(format, val)
+      if err == nil {
+        break header_loop
+      }
+    }
+  }
+
+  return t, err 
 }

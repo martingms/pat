@@ -16,7 +16,7 @@ var (
 )
 
 const (
-	DATE_FORMAT = "Jan 02 15:04"
+	DATE_FORMAT = "Mon 02 15:04"
 )
 
 // Colorscheme

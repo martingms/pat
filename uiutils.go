@@ -35,12 +35,14 @@ func drawString(x, y int, str string) {
 }
 
 func drawList(y, numCols int, colWidths []int, list [][]string, focus int) {
+	// TODO(mg): Don't draw every line, only those that are visible.
 	termw, _ := termbox.Size()
 	for _, line := range list {
 		if y == focus {
 			drawBlankLine(y, FOCUS_BAR_BG_COLOR)
 		}
 		x := 1
+	line_loop:
 		for col, width := range colWidths {
 			if width == -1 {
 				width = termw - x
@@ -54,6 +56,9 @@ func drawList(y, numCols int, colWidths []int, list [][]string, focus int) {
 					termbox.SetCell(x+j, y, r, FOCUS_BAR_TEXT_COLOR, FOCUS_BAR_BG_COLOR)
 				} else {
 					termbox.SetCell(x+j, y, r, termbox.ColorDefault, termbox.ColorDefault)
+				}
+				if x+j >= termw {
+					break line_loop
 				}
 			}
 			x += width
